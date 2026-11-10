@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gantt Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f5f7;--panel:#fff;--line:#e3e6ea;--line2:#eef0f3;--text:#0f172a;--muted:#64748b;
+  --accent:#2563eb;--accent-d:#1d4ed8;--accent-soft:#e0eaff;--crit:#dc2626;--sel:#f1f6ff;
+  --rh:34px;--head:56px;
+  --cols:52px minmax(210px,1fr) 82px 82px 58px 92px 120px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:13px/1.4 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);background:var(--bg);display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+
+/* Toolbar */
+.top{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;flex:1;min-width:240px}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#1e40af);display:grid;place-items:center;flex:none}
+.logo svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round}
+.title-input{font-weight:600;font-size:16px;border:1px solid transparent;border-radius:6px;padding:5px 8px;background:transparent;width:100%;max-width:480px}
+.title-input:hover{border-color:var(--line)}
+.title-input:focus{outline:none;border-color:var(--accent);background:#fff}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grp{display:flex;border:1px solid var(--line);border-radius:8px;background:#fff;position:relative}
+.grp>.btn:first-child{border-radius:7px 0 0 7px}.grp>.btn:last-child{border-radius:0 7px 7px 0}.grp>.btn:only-child{border-radius:7px}
+.grp .btn+.btn{border-left:1px solid var(--line)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px;border:0;background:transparent;font-weight:500;cursor:pointer;white-space:nowrap;border-radius:7px}
+.btn:hover{background:#f3f4f6}
+.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-d)}
+.btn.on{background:var(--accent-soft);color:var(--accent)}
+.btn.danger{color:var(--crit)}
+.btn.danger:hover{background:#fef2f2}
+.btn:disabled{opacity:.35;cursor:default;background:transparent}
+.btn.io{padding:0 8px}
+.menu{position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,.14);padding:6px;min-width:230px;z-index:40;display:none}
+.menu.open{display:block}
+.menu button{display:flex;width:100%;align-items:center;gap:10px;border:0;background:none;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left}
+.menu button:hover{background:#f3f4f6}
+.menu svg{width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.menu hr{border:0;border-top:1px solid var(--line2);margin:5px 0}
+
+/* Main layout */
+.main{flex:1;display:flex;min-height:0;background:var(--panel);margin:12px 12px 6px;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.left{width:720px;flex:none;overflow-x:auto;overflow-y:hidden;position:relative}
+.grid-inner{min-width:716px;padding-bottom:60px}
+.ghead{position:sticky;top:0;z-index:3;height:var(--head);display:grid;grid-template-columns:var(--cols);align-items:end;background:#fafbfc;border-bottom:1px solid var(--line);font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.ghead>div{padding:0 8px 9px;white-space:nowrap;overflow:hidden}
+.grow{display:grid;grid-template-columns:var(--cols);height:var(--rh);align-items:center;border-bottom:1px solid var(--line2);cursor:default;user-select:none}
+.grow>div{padding:0 8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.grow:hover{background:#fafbfc}
+.grow.sel{background:var(--sel);box-shadow:inset 3px 0 var(--accent)}
+.grow.group{font-weight:600}
+.num{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
+.name{display:flex!important;align-items:center;gap:6px}
+.name .txt{overflow:hidden;text-overflow:ellipsis}
+.caret{width:18px;height:18px;flex:none;display:grid;place-items:center;border-radius:4px;cursor:pointer;color:var(--muted);transition:transform .15s}
+.caret:hover{background:#e5e7eb}
+.caret.c{transform:rotate(-90deg)}
+.caret svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.5}
+.sp{width:18px;flex:none}
+.dot{width:9px;height:9px;border-radius:3px;flex:none}
+.msi{width:9px;height:9px;transform:rotate(45deg);flex:none;border-radius:1px}
+.pcell{display:flex!important;align-items:center;gap:7px}
+.pbar{height:5px;background:#eceff3;border-radius:3px;flex:1;overflow:hidden;min-width:24px}
+.pbar>i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.pcell .num{width:30px;text-align:right}
+.owner{color:#334155}
+.empty{padding:40px 20px;color:var(--muted);text-align:center}
+
+.split{width:5px;cursor:col-resize;background:var(--line);flex:none;transition:background .15s}
+.split:hover,.split.drag{background:var(--accent)}
+
+.chart{flex:1;overflow:auto;position:relative;min-width:0}
+.chead{position:sticky;top:0;z-index:6;height:var(--head);background:#fafbfc;border-bottom:1px solid var(--line)}
+.hrow{position:relative;height:28px;overflow:hidden}
+.hrow+.hrow{border-top:1px solid var(--line2)}
+.hc{position:absolute;top:0;height:28px;border-left:1px solid var(--line);font-size:11.5px;font-weight:500;color:var(--muted);padding:6px 0 0;white-space:nowrap}
+.hc span{position:sticky;left:0;padding:0 7px;display:inline-block}
+.hrow.t .hc{font-weight:600;color:#1e293b}
+.hrow.b .hc{text-align:center;padding-top:6px}
+.hrow.b .hc span{position:static;padding:0}
+.hc.we{background:#f1f4f8}
+.hc.td{background:var(--accent);color:#fff;border-radius:4px 4px 0 0}
+.canvas{position:relative;background-image:linear-gradient(to bottom,transparent 33px,var(--line2) 33px);background-size:100% 34px;user-select:none;touch-action:none}
+svg.bg,svg.links,svg.tmp{position:absolute;left:0;top:0;pointer-events:none}
+svg.links path{fill:none;stroke:#94a3b8;stroke-width:1.5}
+svg.links path.crit{stroke:var(--crit);stroke-width:1.8}
+svg.links path.hl{stroke:var(--accent);stroke-width:2}
+.selrow{position:absolute;left:0;right:0;height:var(--rh);background:var(--sel);pointer-events:none}
+.today{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);opacity:.55;pointer-events:none;z-index:2}
+.bar{position:absolute;height:20px;border-radius:5px;cursor:grab;z-index:3;border:1px solid}
+.bar:active{cursor:grabbing}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px 0 0 4px;pointer-events:none}
+.bar .fill.full{border-radius:4px}
+.bar .pct{position:absolute;left:6px;top:2px;font-size:10.5px;font-weight:600;color:#fff;pointer-events:none;text-shadow:0 1px 1px rgba(0,0,0,.15)}
+.h-l,.h-r{position:absolute;top:-1px;bottom:-1px;width:8px;cursor:ew-resize}
+.h-l{left:-3px}.h-r{right:-3px}
+.h-p{position:absolute;bottom:-8px;width:12px;height:9px;margin-left:-6px;cursor:ew-resize;opacity:0}
+.h-p::after{content:"";position:absolute;left:1px;top:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:7px solid #334155}
+.h-link{position:absolute;right:-17px;top:4px;width:11px;height:11px;border-radius:50%;border:2px solid var(--accent);background:#fff;cursor:crosshair;opacity:0}
+.bar:hover .h-p,.bar:hover .h-link,.bar.sel .h-p,.bar.sel .h-link,.ms:hover .h-link,.ms.sel .h-link{opacity:1}
+.bar.sel{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--accent)}
+.bar.crit{box-shadow:0 0 0 2px var(--crit)}
+.bar.sel.crit{box-shadow:0 0 0 2px var(--crit),0 0 0 4px #fff,0 0 0 6px var(--accent)}
+.gbar{position:absolute;height:9px;background:#94a3b8;cursor:grab;z-index:3;border-radius:2px 2px 0 0}
+.gbar .gf{position:absolute;left:0;top:0;bottom:0;background:#334155}
+.gbar::before,.gbar::after{content:"";position:absolute;top:9px;border-top:6px solid #334155}
+.gbar::before{left:0;border-right:7px solid transparent}
+.gbar::after{right:0;border-left:7px solid transparent}
+.gbar.sel{outline:2px solid var(--accent);outline-offset:3px}
+.ms{position:absolute;width:20px;height:20px;cursor:grab;z-index:3}
+.ms i{position:absolute;left:3px;top:3px;width:14px;height:14px;transform:rotate(45deg);border-radius:2px;pointer-events:none}
+.ms .h-link{right:-14px;top:4px}
+.ms.sel i{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--accent)}
+.ms.crit i{box-shadow:0 0 0 2px var(--crit)}
+.blabel{position:absolute;font-size:12px;font-weight:500;color:#334155;white-space:nowrap;pointer-events:none;line-height:var(--rh);z-index:2}
+.blabel em{font-style:normal;color:var(--muted);font-weight:400;margin-left:6px}
+.blabel.g{font-weight:600;color:#0f172a}
+
+.status{display:flex;gap:18px;padding:2px 18px 10px;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.status b{color:#334155;font-weight:600}
+.status .r{margin-left:auto}
+.legend{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:3px;background:var(--crit);display:inline-block;border-radius:2px}
+
+/* Tooltip */
+#tip{position:fixed;z-index:60;background:#0f172a;color:#e2e8f0;border-radius:8px;padding:9px 11px;font-size:12px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;max-width:280px}
+#tip b{color:#fff;display:block;margin-bottom:4px;font-size:12.5px}
+#tip .k{color:#94a3b8;display:inline-block;width:86px}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;place-items:center;z-index:50;padding:16px}
+.modal.open{display:grid}
+.dlg{background:#fff;border-radius:14px;width:min(600px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(15,23,42,.3)}
+.dh{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 22px 12px}
+.dh h3{margin:2px 0 0;font-size:17px}
+.dk{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.x{border:0;background:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:2px 6px;border-radius:6px}
+.x:hover{background:#f3f4f6}
+.db{padding:6px 22px 16px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.f.full{grid-column:1/-1}
+.f>span{font-size:11.5px;font-weight:600;color:#475569}
+.f input:not([type=range]):not([type=checkbox]),.f select,.f textarea{height:36px;border:1px solid #d5d9e0;border-radius:7px;padding:0 10px;background:#fff;width:100%}
+.f textarea{height:auto;padding:8px 10px;resize:vertical}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.f input:disabled,.f select:disabled{background:#f5f6f8;color:#94a3b8}
+.rng{display:flex;align-items:center;gap:10px;height:36px}
+.rng input{flex:1;accent-color:var(--accent)}
+.rng b{width:40px;text-align:right;font-variant-numeric:tabular-nums}
+.sw{display:flex;gap:8px;flex-wrap:wrap}
+.sw button{width:26px;height:26px;border-radius:7px;border:0;cursor:pointer}
+.sw button.on{box-shadow:0 0 0 2px #fff,0 0 0 4px currentColor}
+.deps{border:1px solid #d5d9e0;border-radius:8px;max-height:170px;overflow:auto;padding:4px}
+.deps label{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;cursor:pointer}
+.deps label:hover{background:#f5f7fa}
+.deps .num{width:34px}
+.note{font-size:12px;color:var(--muted);grid-column:1/-1;background:#f8fafc;border-radius:8px;padding:8px 10px}
+.df{display:flex;gap:8px;padding:14px 22px;border-top:1px solid var(--line2)}
+.df .btn{height:36px;padding:0 16px}
+.ghost{border:1px solid var(--line)!important}
+textarea.out{width:100%;height:260px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;border:1px solid #d5d9e0;border-radius:8px;padding:10px}
+.msg{grid-column:1/-1;color:#334155;line-height:1.55}
+
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:70}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.help{font-size:12px;color:#334155;line-height:1.7;grid-column:1/-1}
+.help kbd{font:11px ui-monospace,Menlo,monospace;background:#f1f5f9;border:1px solid #d9dee5;border-bottom-width:2px;border-radius:4px;padding:1px 5px}
+.help td{padding:3px 14px 3px 0;vertical-align:top}
+
+@media (max-width:820px){
+  .left{width:46vw!important;min-width:180px}
+  .main{margin:8px}
+  .btn .lbl{display:none}
+}
+@media print{
+  .tools,.status .r,.split{display:none}
+  body{height:auto;overflow:visible;background:#fff}
+  .main{margin:0;border:0;box-shadow:none;overflow:visible}
+  .left,.chart{overflow:visible}
+  .chead,.ghead{position:static}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M4 6h9M8 12h10M6 18h7"/></svg></div>
+    <input id="title" class="title-input" spellcheck="false" aria-label="Projekttitel">
+  </div>
+  <div class="tools">
+    <div class="grp">
+      <button class="btn primary" data-act="addTask" title="Neue Aufgabe (N)"><i data-i="plus"></i><span class="lbl">Aufgabe</span></button>
+    </div>
+    <div class="grp">
+      <button class="btn" data-act="addMilestone" title="Neuer Meilenstein (M)"><i data-i="diamond"></i><span class="lbl">Meilenstein</span></button>
+      <button class="btn" data-act="addGroup" title="Neue Phase (P)"><i data-i="folder"></i><span class="lbl">Phase</span></button>
+    </div>
+    <div class="grp">
+      <button class="btn io" data-act="outdent" data-sel title="Ausrücken (Umschalt+Tab)"><i data-i="outdent"></i></button>
+      <button class="btn io" data-act="indent" data-sel title="Einrücken (Tab)"><i data-i="indent"></i></button>
+      <button class="btn io" data-act="up" data-sel title="Nach oben (Alt+↑)"><i data-i="up"></i></button>
+      <button class="btn io" data-act="down" data-sel title="Nach unten (Alt+↓)"><i data-i="down"></i></button>
+      <button class="btn io" data-act="edit" data-sel title="Bearbeiten (Enter)"><i data-i="edit"></i></button>
+      <button class="btn io danger" data-act="del" data-sel title="Löschen (Entf)"><i data-i="trash"></i></button>
+    </div>
+    <div class="grp">
+      <button class="btn io" data-act="undo" title="Rückgängig (Strg+Z)"><i data-i="undo"></i></button>
+      <button class="btn io" data-act="redo" title="Wiederholen (Strg+Y)"><i data-i="redo"></i></button>
+    </div>
+    <div class="grp" id="zoom">
+      <button class="btn" data-zoom="day">Tag</button>
+      <button class="btn" data-zoom="week">Woche</button>
+      <button class="btn" data-zoom="month">Monat</button>
+      <button class="btn" data-zoom="quarter">Quartal</button>
+    </div>
+    <div class="grp">
+      <button class="btn" data-act="today" title="Zu heute springen (T)"><i data-i="cal"></i><span class="lbl">Heute</span></button>
+    </div>
+    <div class="grp">
+      <button class="btn" data-act="critical" id="bCrit" title="Kritischen Pfad hervorheben"><i data-i="flag"></i><span class="lbl">Kritischer Pfad</span></button>
+      <button class="btn" data-act="auto" id="bAuto" title="Nachfolger automatisch verschieben"><i data-i="zap"></i><span class="lbl">Auto-Planung</span></button>
+    </div>
+    <div class="grp">
+      <button class="btn" data-act="menu"><i data-i="file"></i><span class="lbl">Datei</span><i data-i="chev"></i></button>
+      <div class="menu" id="menu">
+        <button data-act="new"><i data-i="file"></i>Neues Projekt</button>
+        <button data-act="sample"><i data-i="sparkle"></i>Beispielprojekt laden</button>
+        <hr>
+        <button data-act="import"><i data-i="upload"></i>Projekt importieren (JSON)</button>
+        <button data-act="exportJson"><i data-i="download"></i>Projekt exportieren (JSON)</button>
+        <button data-act="exportCsv"><i data-i="table"></i>Als CSV exportieren (Excel)</button>
+        <button data-act="print" id="mPrint"><i data-i="print"></i>Drucken / als PDF speichern</button>
+        <hr>
+        <button data-act="help"><i data-i="help"></i>Tastenkürzel &amp; Bedienung</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="main" id="main">
+  <div class="left" id="left">
+    <div class="grid-inner">
+      <div class="ghead"><div>PSP</div><div>Vorgang</div><div>Start</div><div>Ende</div><div>Dauer</div><div>Fortschritt</div><div>Verantwortlich</div></div>
+      <div id="gbody"></div>
+    </div>
+  </div>
+  <div class="split" id="split" title="Breite anpassen"></div>
+  <div class="chart" id="chart">
+    <div class="chead" id="chead"></div>
+    <div class="canvas" id="canvas"></div>
+  </div>
+</div>
+<div class="status" id="status"></div>
+
+<div id="tip"></div>
+<div class="modal" id="modal"></div>
+<div id="toast"></div>
+<input type="file" id="file" accept=".json,application/json" hidden>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Konstanten & Hilfsfunktionen ---------- */
+const DAY=864e5, RH=34;
+const ZOOM={day:{dw:34,top:'monthY',bot:'day'},week:{dw:15,top:'monthY',bot:'week'},month:{dw:4.2,top:'year',bot:'month'},quarter:{dw:1.6,top:'year',bot:'quarter'}};
+const COLORS=['#2563eb','#0891b2','#059669','#65a30d','#d97706','#ea580c','#dc2626','#db2777','#7c3aed','#475569','#0f172a'];
+const MON=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const MONL=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const TYPES={task:'Aufgabe',milestone:'Meilenstein',group:'Phase'};
+const KEY='gantt-planner-v1';
+const ICONS={
+ plus:'<path d="M12 5v14M5 12h14"/>',diamond:'<path d="M12 3l9 9-9 9-9-9z"/>',folder:'<path d="M3 6h6l2 2h10v11H3z"/>',
+ indent:'<path d="M3 5h18M11 12h10M3 19h18M3 9l4 3-4 3"/>',outdent:'<path d="M3 5h18M11 12h10M3 19h18M7 9l-4 3 4 3"/>',
+ up:'<path d="M12 19V5M6 11l6-6 6 6"/>',down:'<path d="M12 5v14M6 13l6 6 6-6"/>',
+ trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/>',
+ undo:'<path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-3"/>',redo:'<path d="M15 14l5-5-5-5M20 9H9a5 5 0 000 10h3"/>',
+ cal:'<path d="M4 5h16v15H4zM4 10h16M9 3v4M15 3v4"/>',flag:'<path d="M5 21V4h11l-2 4 2 4H5"/>',zap:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+ file:'<path d="M6 3h9l4 4v14H6zM14 3v5h5"/>',chev:'<path d="M6 9l6 6 6-6"/>',sparkle:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/>',
+ upload:'<path d="M12 20V8M7 13l5-5 5 5M5 4h14"/>',download:'<path d="M12 4v12M7 11l5 5 5-5M5 20h14"/>',
+ table:'<path d="M3 5h18v14H3zM3 10h18M3 15h18M9 5v14"/>',print:'<path d="M6 9V3h12v6M6 18H4v-8h16v8h-2M8 14h8v7H8z"/>',
+ help:'<path d="M12 21a9 9 0 100-18 9 9 0 000 18zM9.5 9a2.5 2.5 0 015 .5c0 1.5-2.5 2-2.5 3.5M12 17h.01"/>'
+};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const D=n=>new Date(n*DAY);
+const ymd=n=>{const d=D(n);return[d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()]};
+const mk=(y,m,d)=>Math.round(Date.UTC(y,m,d)/DAY);
+const iso=n=>D(n).toISOString().slice(0,10);
+const parse=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?mk(+m[1],+m[2]-1,+m[3]):NaN};
+const fmt=n=>{const[y,m,d]=ymd(n);return String(d).padStart(2,'0')+'.'+String(m+1).padStart(2,'0')+'.'+String(y).slice(2)};
+const fmtL=n=>{const[y,m,d]=ymd(n);return String(d).padStart(2,'0')+'.'+String(m+1).padStart(2,'0')+'.'+y};
+const wd=n=>(D(n).getUTCDay()+6)%7; // 0=Mo
+const isWE=n=>wd(n)>4;
+const nextWork=n=>{while(isWE(n))n++;return n};
+const monday=n=>n-wd(n);
+const todayN=()=>{const t=new Date();return mk(t.getFullYear(),t.getMonth(),t.getDate())};
+const workdays=(a,b)=>{if(b<a)return 0;let c=0;for(let i=a;i<=b;i++)if(!isWE(i))c++;return c};
+const addWork=(s,n)=>{if(n<=1)return s;let e=s,c=isWE(s)?0:1;while(c<n){e++;if(!isWE(e))c++}return e};
+function isoWeek(n){const th=n-wd(n)+3;const y=D(th).getUTCFullYear();const j4=mk(y,0,4);return 1+Math.round((th-(j4-wd(j4)+3))/7)}
+const uid=()=>'t'+Math.random().toString(36).slice(2,9);
+let inFrame=true;try{inFrame=window.self!==window.top}catch(e){inFrame=true}
+
+/* ---------- Beispielprojekt ---------- */
+const M_=T=>{const m={};T.forEach(t=>m[t.id]=t);return m};
+function sample(){
+  const b=monday(todayN())-21;const T=[];let n=0;
+  const add=o=>{const t=Object.assign({id:'t'+(++n),name:'',type:'task',s:b,e:b,progress:0,owner:'',color:COLORS[0],deps:[],parent:null,collapsed:false,notes:''},o);T.push(t);return t};
+  const g1=add({name:'Initiierung',type:'group'});
+  const a1=add({name:'Kick-off & Zieldefinition',parent:g1.id,s:b,dur:3,progress:100,owner:'Projektleitung'});
+  const a2=add({name:'Stakeholder-Analyse',parent:g1.id,s:b,dur:5,progress:100,owner:'Projektleitung',deps:[a1.id]});
+  const m1=add({name:'Projektauftrag freigegeben',type:'milestone',parent:g1.id,s:b,e:b,progress:100,color:'#0f172a',deps:[a2.id]});
+  const g2=add({name:'Konzeption',type:'group'});
+  const c1=add({name:'Ist-Analyse der Prozesse',parent:g2.id,s:b,dur:7,progress:90,owner:'Business Analyst',color:'#0891b2',deps:[m1.id]});
+  const c2=add({name:'Zielarchitektur',parent:g2.id,s:b,dur:10,progress:50,owner:'Enterprise Architect',color:'#0891b2',deps:[m1.id]});
+  const c3=add({name:'Fachkonzept',parent:g2.id,s:b,dur:8,progress:20,owner:'Business Analyst',color:'#0891b2',deps:[c1.id]});
+  const m2=add({name:'Konzept abgenommen',type:'milestone',parent:g2.id,s:b,e:b,color:'#0f172a',deps:[c2.id,c3.id]});
+  const g3=add({name:'Umsetzung',type:'group'});
+  const d1=add({name:'Systemkonfiguration',parent:g3.id,s:b,dur:12,owner:'IT-Betrieb',color:'#059669',deps:[m2.id]});
+  const d2=add({name:'Schnittstellen entwickeln',parent:g3.id,s:b,dur:18,owner:'Integration',color:'#059669',deps:[m2.id]});
+  const d3=add({name:'Datenmigration',parent:g3.id,s:b,dur:10,owner:'IT-Betrieb',color:'#059669',deps:[d1.id]});
+  const g4=add({name:'Test & Go-Live',type:'group'});
+  const e1=add({name:'Integrationstest',parent:g4.id,s:b,dur:8,owner:'QA',color:'#d97706',deps:[d2.id,d3.id]});
+  const e2=add({name:'Schulung Key-User',parent:g4.id,s:b,dur:6,owner:'Projektleitung',color:'#d97706',deps:[d1.id]});
+  add({name:'Go-Live',type:'milestone',parent:g4.id,s:b,e:b,color:'#0f172a',deps:[e1.id,e2.id]});
+  const m=M_(T);T.forEach(t=>{if(t.type==='group')return;let s=t.s;if(t.deps.length)s=Math.max(...t.deps.map(d=>m[d].e+gap(m[d],t)));if(t.type!=='milestone')s=nextWork(s);
+    t.e=t.type==='milestone'?s:addWork(s,t.dur);t.s=s;delete t.dur});
+  return{title:'ERP-Einführung – Beispielprojekt',tasks:T};
+}
+
+/* ---------- Zustand ---------- */
+let state, sel=null, undoS=[], redoS=[], R={a:0,b:0,dw:15}, lastDown={id:null,t:0};
+function defaults(o){return Object.assign({title:'Neues Projekt',tasks:[],zoom:'week',critical:false,auto:true,gridW:720},o)}
+function load(){
+  try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&Array.isArray(o.tasks))return defaults(o)}}catch(e){}
+  return defaults(sample());
+}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function snap(){undoS.push(JSON.stringify(state.tasks));if(undoS.length>150)undoS.shift();redoS=[]}
+function commit(){computeGroups();schedule();computeGroups();persist();render()}
+function undo(){if(!undoS.length)return toast('Nichts rückgängig zu machen');redoS.push(JSON.stringify(state.tasks));state.tasks=JSON.parse(undoS.pop());if(sel&&!M()[sel])sel=null;commit()}
+function redo(){if(!redoS.length)return;undoS.push(JSON.stringify(state.tasks));state.tasks=JSON.parse(redoS.pop());if(sel&&!M()[sel])sel=null;commit()}
+const M=()=>{const m={};state.tasks.forEach(t=>m[t.id]=t);return m};
+const cur=()=>sel?M()[sel]:null;
+
+/* ---------- Struktur ---------- */
+function isDesc(t,id,m){let p=t.parent,g=0;while(p&&g++<99){if(p===id)return true;p=m[p]?m[p].parent:null}return false}
+function block(id){const ts=state.tasks,m=M();const i=ts.findIndex(t=>t.id===id);let j=i+1;while(j<ts.length&&isDesc(ts[j],id,m))j++;return[i,j]}
+function depth(t,m){let d=0,p=t.parent;while(p&&m[p]&&d<20){d++;p=m[p].parent}return d}
+function visible(){const m=M();return state.tasks.filter(t=>{let p=t.parent,g=0;while(p&&m[p]&&g++<99){if(m[p].collapsed)return false;p=m[p].parent}return true})}
+function wbs(){const o={},c={};state.tasks.forEach(t=>{const k=t.parent||'_';c[k]=(c[k]||0)+1;o[t.id]=(t.parent&&o[t.parent]?o[t.parent]+'.':'')+c[k]});return o}
+function hasKids(id){return state.tasks.some(t=>t.parent===id)}
+function computeGroups(){
+  const ts=state.tasks;
+  for(let i=ts.length-1;i>=0;i--){const g=ts[i];if(g.type!=='group')continue;const k=ts.filter(t=>t.parent===g.id);if(!k.length)continue;
+    g.s=Math.min(...k.map(t=>t.s));g.e=Math.max(...k.map(t=>t.e));
+    let w=0,p=0;k.forEach(t=>{const d=t.type==='milestone'?0:Math.max(1,workdays(t.s,t.e));w+=d;p+=d*t.progress});
+    g.progress=w?Math.round(p/w):0}
+}
+function gap(p,t){return t.type==='milestone'?0:1}
+function schedule(){
+  if(!state.auto)return;const m=M();
+  for(let k=0;k<=state.tasks.length;k++){let ch=false;
+    state.tasks.forEach(t=>{if(t.type==='group'||!t.deps.length)return;let min=-Infinity;
+      t.deps.forEach(d=>{const p=m[d];if(p)min=Math.max(min,p.e+gap(p,t))});
+      if(t.s<min){const dur=t.e-t.s;let s=min;if(t.type!=='milestone')s=nextWork(s);t.s=s;t.e=s+dur;ch=true}});
+    if(!ch)break}
+}
+function dependsOn(a,b,m){const seen=new Set(),st=[a];while(st.length){const c=st.pop();if(c===b)return true;if(seen.has(c))continue;seen.add(c);(m[c]?m[c].deps:[]).forEach(d=>st.push(d))}return false}
+function critical(){
+  const ts=state.tasks.filter(t=>t.type!=='group');if(!ts.length)return new Set();
+  const end=Math.max(...ts.map(t=>t.e)),succ={},lf={};
+  ts.forEach(t=>{lf[t.id]=end;t.deps.forEach(d=>(succ[d]=succ[d]||[]).push(t))});
+  for(let it=0;it<=ts.length;it++){let ch=false;
+    ts.forEach(t=>(succ[t.id]||[]).forEach(s=>{let v=lf[s.id]-(s.e-s.s)-gap(t,s);if(t.type!=='milestone')while(isWE(v))v--;if(v<lf[t.id]){lf[t.id]=v;ch=true}}));
+    if(!ch)break}
+  const c=new Set();ts.forEach(t=>{if(lf[t.id]<=t.e||workdays(t.e+1,lf[t.id])===0)c.add(t.id)});return c;
+}
+
+/* ---------- Rendering ---------- */
+function render(){
+  const rows=visible(),crit=state.critical?critical():new Set();
+  renderGrid(rows,crit);renderChart(rows,crit);renderStatus();syncUI();
+}
+function renderGrid(rows,crit){
+  const m=M(),W=wbs();
+  if(!rows.length){$('#gbody').innerHTML='<div class="empty">Noch keine Vorgänge.<br>Leg mit <b>+ Aufgabe</b> los.</div>';return}
+  $('#gbody').innerHTML=rows.map(t=>{
+    const d=depth(t,m),g=t.type==='group',ms=t.type==='milestone';
+    const lead=g?`<span class="caret${t.collapsed?' c':''}" data-tog="${t.id}"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>`:'<span class="sp"></span>';
+    const ico=ms?`<span class="msi" style="background:${t.color}"></span>`:g?'':`<span class="dot" style="background:${t.color}"></span>`;
+    const dur=ms?'—':workdays(t.s,t.e)+' T';
+    return `<div class="grow${g?' group':''}${t.id===sel?' sel':''}" data-row="${t.id}">
+      <div class="num">${W[t.id]}</div>
+      <div class="name" style="padding-left:${6+d*18}px">${lead}${ico}<span class="txt" title="${esc(t.name)}">${esc(t.name)}</span></div>
+      <div class="num">${fmt(t.s)}</div><div class="num">${fmt(t.e)}</div><div class="num">${dur}</div>
+      <div class="pcell"><span class="pbar"><i style="width:${t.progress}%;${crit.has(t.id)?'background:var(--crit)':g?'background:#334155':''}"></i></span><span class="num">${t.progress}%</span></div>
+      <div class="owner">${esc(t.owner)}</div></div>`}).join('');
+}
+function range(){
+  const ts=state.tasks,z=state.zoom,dw=ZOOM[z].dw;let a=todayN(),b=a;
+  if(ts.length){a=Math.min(a,...ts.map(t=>t.s));b=Math.max(b,...ts.map(t=>t.e))}
+  const pad={day:7,week:14,month:45,quarter:120}[z];a-=pad;b+=pad*2;
+  if(z==='day'||z==='week')a=monday(a);else{const[y,mo]=ymd(a);a=mk(y,z==='quarter'?mo-mo%3:mo,1)}
+  const vw=$('#chart').clientWidth||900,need=Math.ceil(vw/dw)+2;if(b-a+1<need)b=a+need-1;
+  return{a,b,dw};
+}
+function segs(a,b,u){const o=[];let n=a,g=0;while(n<=b&&g++<5000){const[y,m,d]=ymd(n);let nx,l;
+  if(u==='day'){nx=n+1;l=d}else if(u==='week'){nx=monday(n)+7;l='KW '+isoWeek(n)}
+  else if(u==='month'){nx=mk(y,m+1,1);l=MON[m]}else if(u==='monthY'){nx=mk(y,m+1,1);l=MONL[m]+' '+y}
+  else if(u==='quarter'){const q=Math.floor(m/3);nx=mk(y,q*3+3,1);l='Q'+(q+1)+' '+String(y).slice(2)}else{nx=mk(y+1,0,1);l=y}
+  o.push({s:n,e:Math.min(nx,b+1),l});n=nx}return o}
+function renderChart(rows,crit){
+  R=range();const{a,b,dw}=R,z=ZOOM[state.zoom],W=Math.round((b-a+1)*dw),H=Math.max(rows.length*RH,RH),td=todayN(),m=M();
+  // Kopf
+  const top=segs(a,b,z.top),bot=segs(a,b,z.bot);
+  const hc=(s,cls)=>s.map(x=>`<div class="hc ${cls(x)}" style="left:${(x.s-a)*dw}px;width:${(x.e-x.s)*dw}px"><span>${x.l}</span></div>`).join('');
+  $('#chead').style.width=W+'px';
+  $('#chead').innerHTML=`<div class="hrow t">${hc(top,()=>'')}</div><div class="hrow b">${hc(bot,x=>state.zoom==='day'?(x.s===td?'td':isWE(x.s)?'we':''):'')}</div>`;
+  // Hintergrund
+  let bg='';
+  if(state.zoom==='day'||state.zoom==='week'){for(let n=a;n<=b;n++)if(wd(n)===5)bg+=`<rect x="${(n-a)*dw}" y="0" width="${2*dw}" height="${H}" fill="#f5f7fa"/>`}
+  bot.forEach(x=>bg+=`<line x1="${(x.s-a)*dw+.5}" x2="${(x.s-a)*dw+.5}" y1="0" y2="${H}" stroke="#eef0f3"/>`);
+  top.forEach(x=>bg+=`<line x1="${(x.s-a)*dw+.5}" x2="${(x.s-a)*dw+.5}" y1="0" y2="${H}" stroke="#dfe3e8"/>`);
+  // Zeilenindex
+  const ri={};rows.forEach((t,i)=>ri[t.id]=i);
+  const X=n=>(n-a)*dw;
+  const msX=t=>X(t.s+1);
+  const endX=t=>t.type==='milestone'?msX(t)+8:X(t.e+1);
+  const startX=t=>t.type==='milestone'?msX(t)-8:X(t.s);
+  // Pfeile
+  let links='';
+  rows.forEach(t=>t.deps.forEach(d=>{if(ri[d]==null)return;const p=m[d];
+    const x1=endX(p),y1=ri[d]*RH+RH/2,x2=startX(t),y2=ri[t.id]*RH+RH/2;let path;
+    if(x2-x1>=14){const mx=x1+7;path=`M${x1},${y1}H${mx}V${y2}H${x2-1}`}
+    else{const ym=y2>y1?ri[t.id]*RH:ri[t.id]*RH+RH;path=`M${x1},${y1}h7V${ym}H${x2-12}V${y2}H${x2-1}`}
+    const c=state.critical&&crit.has(t.id)&&crit.has(p.id);const hl=sel&&(sel===t.id||sel===p.id);
+    links+=`<path d="${path}" class="${c?'crit':hl?'hl':''}" marker-end="url(#${c?'ac':hl?'ah':'aa'})"/>`}));
+  // Balken
+  let bars='',labels='';
+  rows.forEach((t,i)=>{const y=i*RH,x=X(t.s),w=Math.max((t.e-t.s+1)*dw,3),isSel=t.id===sel,c=state.critical&&crit.has(t.id);
+    const own=t.owner?`<em>${esc(t.owner)}</em>`:'';
+    if(t.type==='milestone'){const cx=msX(t);
+      bars+=`<div class="ms${isSel?' sel':''}${c?' crit':''}" data-id="${t.id}" data-h="m" style="left:${cx-10}px;top:${y+7}px"><i style="background:${t.color}"></i><span class="h-link" data-h="link"></span></div>`;
+      labels+=`<div class="blabel" style="left:${cx+(isSel?28:16)}px;top:${y}px">${esc(t.name)} <em>${fmt(t.s)}</em></div>`;
+    }else if(t.type==='group'){
+      bars+=`<div class="gbar${isSel?' sel':''}" data-id="${t.id}" data-h="m" style="left:${x}px;top:${y+10}px;width:${w}px"><div class="gf" style="width:${t.progress}%"></div></div>`;
+      labels+=`<div class="blabel g" style="left:${x+w+10}px;top:${y}px">${esc(t.name)} <em>${t.progress}%</em></div>`;
+    }else{
+      const showPct=w>44&&t.progress>0&&(t.progress/100*w)>34;
+      bars+=`<div class="bar${isSel?' sel':''}${c?' crit':''}" data-id="${t.id}" data-h="m" style="left:${x}px;top:${y+7}px;width:${w}px;background:${t.color}2e;border-color:${t.color}">
+        <div class="fill${t.progress>=100?' full':''}" style="width:${t.progress}%;background:${t.color}"></div>${showPct?`<span class="pct">${t.progress}%</span>`:''}
+        <span class="h-l" data-h="l"></span><span class="h-r" data-h="r"></span><span class="h-p" data-h="p" style="left:${t.progress}%"></span><span class="h-link" data-h="link"></span></div>`;
+      labels+=`<div class="blabel" style="left:${x+w+22}px;top:${y}px">${esc(t.name)}${own}</div>`;
+    }});
+  const selRow=sel&&ri[sel]!=null?`<div class="selrow" style="top:${ri[sel]*RH}px"></div>`:'';
+  const todayL=td>=a&&td<=b?`<div class="today" style="left:${X(td)+(state.zoom==='day'?dw/2:0)-1}px"></div>`:'';
+  const mk_=(id,col)=>`<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="${col}"/></marker>`;
+  const cv=$('#canvas');cv.style.width=W+'px';cv.style.height=(H+40)+'px';
+  cv.innerHTML=`<svg class="bg" width="${W}" height="${H+40}">${bg}</svg>${selRow}${todayL}
+    <svg class="links" width="${W}" height="${H}"><defs>${mk_('aa','#94a3b8')}${mk_('ac','#dc2626')}${mk_('ah','#2563eb')}</defs>${links}</svg>${bars}${labels}`;
+}
+function renderStatus(){
+  const ts=state.tasks.filter(t=>t.type!=='group');let txt='';
+  if(ts.length){const a=Math.min(...ts.map(t=>t.s)),b=Math.max(...ts.map(t=>t.e));let w=0,p=0;
+    ts.forEach(t=>{if(t.type==='milestone')return;const d=workdays(t.s,t.e)||1;w+=d;p+=d*t.progress});
+    const msOpen=ts.filter(t=>t.type==='milestone'&&t.progress<100).sort((x,y)=>x.s-y.s)[0];
+    txt=`<span><b>${state.tasks.length}</b> Vorgänge</span><span>Zeitraum <b>${fmtL(a)} – ${fmtL(b)}</b></span><span><b>${workdays(a,b)}</b> Arbeitstage</span><span>Gesamtfortschritt <b>${w?Math.round(p/w):0}%</b></span>${msOpen?`<span>Nächster Meilenstein <b>${esc(msOpen.name)}</b> (${fmt(msOpen.s)})</span>`:''}`;
+  }
+  txt+=`${state.critical?'<span class="legend"><i></i>Kritischer Pfad</span>':''}<span class="r">Automatisch im Browser gespeichert</span>`;
+  $('#status').innerHTML=txt;
+}
+function syncUI(){
+  document.querySelectorAll('[data-zoom]').forEach(b=>b.classList.toggle('on',b.dataset.zoom===state.zoom));
+  $('#bCrit').classList.toggle('on',!!state.critical);$('#bAuto').classList.toggle('on',!!state.auto);
+  document.querySelectorAll('[data-sel]').forEach(b=>b.disabled=!sel);
+  document.querySelector('[data-act=undo]').disabled=!undoS.length;document.querySelector('[data-act=redo]').disabled=!redoS.length;
+  if(document.activeElement!==$('#title'))$('#title').value=state.title;
+  document.title=(state.title||'Projekt')+' – Gantt Planner';
+}
+
+/* ---------- Aktionen ---------- */
+function addItem(type){
+  snap();const m=M(),ref=cur();let parent=null,ins=state.tasks.length,base=nextWork(todayN());
+  if(ref){if(ref.type==='group'){parent=ref.id;base=ref.s}else{parent=ref.parent;base=ref.e+1}ins=block(ref.id)[1]}
+  const s=type==='milestone'?(ref&&ref.type!=='group'?ref.e:base):nextWork(base);
+  const t={id:uid(),name:TYPES[type]==='Phase'?'Neue Phase':type==='milestone'?'Neuer Meilenstein':'Neue Aufgabe',type,s,e:type==='milestone'?s:addWork(s,5),
+    progress:0,owner:'',color:type==='milestone'?'#0f172a':(ref&&ref.type==='task'?ref.color:COLORS[0]),deps:[],parent,collapsed:false,notes:''};
+  if(ref&&ref.type!=='group'&&type!=='group')t.deps=[ref.id];
+  state.tasks.splice(ins,0,t);sel=t.id;commit();ensureVisible(t);openDialog(t.id,true);
+}
+function indent(){const t=cur();if(!t)return;const ts=state.tasks;let k=ts.indexOf(t)-1;
+  while(k>=0&&ts[k].parent!==t.parent&&ts[k].id!==t.parent)k--;
+  if(k<0||ts[k].id===t.parent)return toast('Kein übergeordneter Vorgang möglich');
+  snap();const p=ts[k];if(p.type!=='group'){p.type='group';p.deps=[];state.tasks.forEach(x=>x.deps=x.deps.filter(d=>d!==p.id))}
+  p.collapsed=false;t.parent=p.id;commit()}
+function outdent(){const t=cur();if(!t||!t.parent)return;snap();const P=M()[t.parent];const[a,b]=block(t.id);const blk=state.tasks.splice(a,b-a);t.parent=P.parent;const pe=block(P.id)[1];state.tasks.splice(pe,0,...blk);commit()}
+function move(dir){const t=cur();if(!t)return;const ts=state.tasks;const[a,b]=block(t.id);
+  if(dir<0){let k=a-1;while(k>=0&&ts[k].parent!==t.parent&&ts[k].id!==t.parent)k--;if(k<0||ts[k].id===t.parent)return;snap();const blk=ts.splice(a,b-a);ts.splice(k,0,...blk)}
+  else{if(b>=ts.length||ts[b].parent!==t.parent)return;snap();const nb=block(ts[b].id)[1];const blk=ts.splice(a,b-a);ts.splice(nb-blk.length,0,...blk)}
+  commit()}
+function del(){const t=cur();if(!t)return;snap();const[a,b]=block(t.id);const rm=new Set(state.tasks.slice(a,b).map(x=>x.id));
+  state.tasks.splice(a,b-a);state.tasks.forEach(x=>x.deps=x.deps.filter(d=>!rm.has(d)));
+  const vis=visible();sel=vis[Math.min(vis.length-1,Math.max(0,a-1))]?.id||null;commit();
+  toast((rm.size>1?rm.size+' Vorgänge':'Vorgang')+' gelöscht – Strg+Z macht es rückgängig')}
+function setZoom(z){const ch=$('#chart'),day=R.a+(ch.scrollLeft+ch.clientWidth/2)/R.dw;state.zoom=z;persist();render();ch.scrollLeft=(day-R.a)*R.dw-ch.clientWidth/2}
+function goToday(){const ch=$('#chart');ch.scrollTo({left:(todayN()-R.a)*R.dw-ch.clientWidth/3,behavior:'smooth'})}
+function ensureVisible(t){const ch=$('#chart'),x=(t.s-R.a)*R.dw;if(x<ch.scrollLeft+20||x>ch.scrollLeft+ch.clientWidth-160)ch.scrollTo({left:x-80,behavior:'smooth'});
+  const i=visible().findIndex(v=>v.id===t.id);if(i>=0){const y=i*RH,vh=ch.clientHeight-56;if(y<ch.scrollTop)ch.scrollTop=y;else if(y+RH>ch.scrollTop+vh)ch.scrollTop=y+RH-vh}}
+function select(id,scroll){if(sel===id)return;sel=id;render();if(scroll&&id)ensureVisible(M()[id])}
+
+/* ---------- Dialoge ---------- */
+const modal=$('#modal');let onClose=null;
+function showModal(html){modal.innerHTML=html;modal.classList.add('open');hideTip();return modal.firstElementChild}
+function closeModal(cancel){if(!modal.classList.contains('open'))return;modal.classList.remove('open');modal.innerHTML='';const f=onClose;onClose=null;if(f)f(cancel)}
+modal.addEventListener('pointerdown',e=>{if(e.target===modal)closeModal(true)});
+function askConfirm(title,msg,ok,cb){const d=showModal(`<div class="dlg"><div class="dh"><div><h3>${title}</h3></div><button class="x" data-close>×</button></div><div class="db"><div class="msg">${msg}</div></div><div class="df"><span style="flex:1"></span><button class="btn ghost" data-close>Abbrechen</button><button class="btn primary" data-ok>${ok}</button></div></div>`);
+  d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(true));d.querySelector('[data-ok]').onclick=()=>{closeModal();cb()};d.querySelector('[data-ok]').focus()}
+
+function openDialog(id,isNew){
+  const m=M(),t=m[id];if(!t)return;const W=wbs(),kids=hasKids(id);
+  const cands=state.tasks.filter(x=>x.id!==id&&x.type!=='group'&&!dependsOn(x.id,id,m));
+  let color=t.color;
+  const opts=Object.entries(TYPES).map(([k,v])=>`<option value="${k}"${t.type===k?' selected':''}>${v}</option>`).join('');
+  const depList=cands.length?cands.map(x=>`<label><input type="checkbox" value="${x.id}"${t.deps.includes(x.id)?' checked':''}><span class="num">${W[x.id]}</span><span>${esc(x.name)}</span><span class="num" style="margin-left:auto;width:auto">${fmt(x.e)}</span></label>`).join(''):'<div class="empty" style="padding:14px">Keine möglichen Vorgänger</div>';
+  const dis=kids?' disabled':'';
+  const d=showModal(`<form class="dlg" autocomplete="off">
+    <div class="dh"><div><div class="dk">${isNew?'Neu':'Bearbeiten'} · PSP ${W[id]}</div><h3 id="dT">${TYPES[t.type]}</h3></div><button type="button" class="x" data-close>×</button></div>
+    <div class="db">
+      <label class="f full"><span>Bezeichnung</span><input name="name" value="${esc(t.name)}" required></label>
+      <label class="f"><span>Typ</span><select name="type"${dis}>${opts}</select></label>
+      <label class="f"><span>Verantwortlich</span><input name="owner" value="${esc(t.owner)}" placeholder="z. B. Projektleitung"></label>
+      <label class="f"><span>Start</span><input type="date" name="s" value="${iso(t.s)}"${dis}></label>
+      <label class="f"><span>Ende</span><input type="date" name="e" value="${iso(t.e)}"${dis}></label>
+      <label class="f"><span>Dauer (Arbeitstage)</span><input type="number" name="dur" min="1" value="${Math.max(1,workdays(t.s,t.e))}"${dis}></label>
+      <label class="f"><span>Fortschritt</span><div class="rng"><input type="range" name="progress" min="0" max="100" step="5" value="${t.progress}"${dis}><b>${t.progress}%</b></div></label>
+      ${kids?'<div class="note">Termine und Fortschritt einer Phase ergeben sich automatisch aus ihren Untervorgängen.</div>':''}
+      <div class="f full" id="fCol"><span>Farbe</span><div class="sw">${COLORS.map(c=>`<button type="button" data-c="${c}" style="background:${c};color:${c}" class="${c===color?'on':''}"></button>`).join('')}</div></div>
+      <div class="f full" id="fDeps"><span>Vorgänger (Ende → Anfang)</span><div class="deps">${depList}</div></div>
+      <label class="f full"><span>Notizen</span><textarea name="notes" rows="3">${esc(t.notes)}</textarea></label>
+    </div>
+    <div class="df">${isNew?'':'<button type="button" class="btn danger" data-del>Löschen</button>'}<span style="flex:1"></span><button type="button" class="btn ghost" data-close>Abbrechen</button><button class="btn primary" type="submit">Speichern</button></div>
+  </form>`);
+  const el=d.elements;
+  const vis=()=>{const ty=el.type.value;d.querySelector('#dT').textContent=TYPES[ty];d.querySelector('#fDeps').style.display=ty==='group'?'none':'';
+    const ms=ty==='milestone';if(!kids){el.e.disabled=ms;el.dur.disabled=ms}};
+  vis();el.type.onchange=vis;
+  el.progress.oninput=()=>el.progress.nextElementSibling.textContent=el.progress.value+'%';
+  const recalcDur=()=>{const s=parse(el.s.value),e=parse(el.e.value);if(!isNaN(s)&&!isNaN(e)&&e>=s)el.dur.value=Math.max(1,workdays(s,e))};
+  el.s.onchange=()=>{const s=parse(el.s.value);if(!isNaN(s)&&el.type.value!=='milestone'){el.e.value=iso(addWork(s,+el.dur.value||1))}};
+  el.e.onchange=recalcDur;
+  el.dur.oninput=()=>{const s=parse(el.s.value),n=+el.dur.value;if(!isNaN(s)&&n>0)el.e.value=iso(addWork(s,n))};
+  d.querySelectorAll('.sw button').forEach(b=>b.onclick=()=>{color=b.dataset.c;d.querySelectorAll('.sw button').forEach(x=>x.classList.toggle('on',x===b))});
+  d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(true));
+  const dl=d.querySelector('[data-del]');if(dl)dl.onclick=()=>{closeModal();sel=id;del()};
+  onClose=cancel=>{if(cancel&&isNew){state.tasks=JSON.parse(undoS.pop()||'[]');sel=null;commit()}};
+  d.onsubmit=e=>{e.preventDefault();if(!isNew)snap();
+    t.name=el.name.value.trim()||TYPES[t.type];t.owner=el.owner.value.trim();t.notes=el.notes.value;t.color=color;
+    if(!kids){t.type=el.type.value;let s=parse(el.s.value),en=parse(el.e.value);
+      if(!isNaN(s)){if(isNaN(en)||t.type==='milestone')en=s;if(en<s)[s,en]=[en,s];t.s=s;t.e=en}
+      t.progress=+el.progress.value}
+    t.deps=t.type==='group'?[]:[...d.querySelectorAll('.deps input:checked')].map(i=>i.value);
+    if(t.type==='group')state.tasks.forEach(x=>x.deps=x.deps.filter(z=>z!==t.id));
+    onClose=null;closeModal();commit()};
+  setTimeout(()=>{el.name.focus();if(isNew)el.name.select()},30);
+}
+function showHelp(){const d=showModal(`<div class="dlg"><div class="dh"><div><div class="dk">Hilfe</div><h3>Bedienung &amp; Tastenkürzel</h3></div><button class="x" data-close>×</button></div><div class="db"><div class="help"><table>
+<tr><td><b>Balken ziehen</b></td><td>Vorgang verschieben (Phasen verschieben alle Untervorgänge)</td></tr>
+<tr><td><b>Balkenränder ziehen</b></td><td>Start bzw. Ende ändern</td></tr>
+<tr><td><b>Dreieck unter dem Balken</b></td><td>Fortschritt einstellen</td></tr>
+<tr><td><b>Kreis rechts am Balken</b></td><td>Auf einen anderen Vorgang ziehen → Abhängigkeit (Ende → Anfang)</td></tr>
+<tr><td><b>Doppelklick</b></td><td>Vorgang bearbeiten</td></tr>
+<tr><td><kbd>N</kbd> <kbd>M</kbd> <kbd>P</kbd></td><td>Neue Aufgabe / Meilenstein / Phase</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>Ausgewählten Vorgang bearbeiten</td></tr>
+<tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Auswahl wechseln</td></tr>
+<tr><td><kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd></td><td>Vorgang verschieben</td></tr>
+<tr><td><kbd>Tab</kbd> / <kbd>⇧</kbd>+<kbd>Tab</kbd></td><td>Einrücken / Ausrücken</td></tr>
+<tr><td><kbd>Entf</kbd></td><td>Löschen</td></tr>
+<tr><td><kbd>Strg</kbd>+<kbd>Z</kbd> / <kbd>Strg</kbd>+<kbd>Y</kbd></td><td>Rückgängig / Wiederholen</td></tr>
+<tr><td><kbd>1</kbd>–<kbd>4</kbd>, <kbd>T</kbd></td><td>Zoom Tag/Woche/Monat/Quartal, zu heute springen</td></tr>
+</table><p style="margin:12px 0 0;color:#64748b"><b>Auto-Planung</b> verschiebt Nachfolger automatisch, wenn ein Vorgänger später endet. Der <b>kritische Pfad</b> zeigt alle Vorgänge ohne Puffer bis zum Projektende. Daten werden lokal in deinem Browser gespeichert – für Weitergabe oder Backup nutze den JSON-Export.</p></div></div></div>`);
+  d.querySelector('[data-close]').onclick=()=>closeModal(true)}
+
+/* ---------- Import / Export ---------- */
+function exportObj(){return{format:'gantt-planner',version:1,title:state.title,exported:new Date().toISOString(),
+  tasks:state.tasks.map(t=>({id:t.id,name:t.name,type:t.type,start:iso(t.s),end:iso(t.e),progress:t.progress,owner:t.owner,color:t.color,parent:t.parent,dependencies:t.deps,notes:t.notes,collapsed:!!t.collapsed}))}}
+function slug(){return(state.title||'projekt').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')||'projekt'}
+let dlNs;const dlP=(window.claude&&typeof window.claude.use==='function')?window.claude.use('downloads').then(n=>dlNs=n).catch(()=>null):Promise.resolve(null);
+async function deliver(name,text,mime){
+  if(inFrame&&dlNs){try{await dlNs.save({filename:name,data:text});toast(name+' gespeichert');return}catch(e){if(e&&e.code==='declined')return;if(e&&e.code==='rate_limited')return toast('Bitte kurz warten und erneut versuchen')}}
+  if(!inFrame){try{const u=URL.createObjectURL(new Blob([text],{type:mime}));const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);toast(name+' heruntergeladen');return}catch(e){}}
+  const d=showModal(`<div class="dlg"><div class="dh"><div><div class="dk">Export</div><h3>${esc(name)}</h3></div><button class="x" data-close>×</button></div><div class="db"><div class="msg">In dieser Ansicht sind Downloads gesperrt. Kopiere den Inhalt und speichere ihn als <b>${esc(name)}</b>.</div><div class="f full"><textarea class="out" readonly>${esc(text)}</textarea></div></div><div class="df"><span style="flex:1"></span><button class="btn ghost" data-close>Schließen</button><button class="btn primary" data-copy>In Zwischenablage kopieren</button></div></div>`);
+  d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(true));
+  d.querySelector('[data-copy]').onclick=async()=>{const ta=d.querySelector('textarea');try{await navigator.clipboard.writeText(text);toast('Kopiert')}catch(e){ta.select();try{document.execCommand('copy');toast('Kopiert')}catch(_){toast('Bitte manuell kopieren (Strg+C)')}}};
+}
+function exportCsv(){const W=wbs(),q=v=>{v=String(v??'');return/[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=[['PSP','Vorgang','Typ','Start','Ende','Dauer (AT)','Fortschritt %','Verantwortlich','Vorgänger','Notizen']];
+  state.tasks.forEach(t=>rows.push([W[t.id],t.name,TYPES[t.type],fmtL(t.s),fmtL(t.e),t.type==='milestone'?0:workdays(t.s,t.e),t.progress,t.owner,t.deps.map(d=>W[d]).filter(Boolean).join(', '),t.notes]));
+  deliver(slug()+'.csv','﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
+function importText(txt){
+  let o;try{o=JSON.parse(txt)}catch(e){return toast('Datei ist kein gültiges JSON')}
+  const arr=Array.isArray(o)?o:o&&o.tasks;if(!Array.isArray(arr))return toast('Keine Vorgänge in der Datei gefunden');
+  const ids=new Set(arr.map(t=>String(t.id)));
+  const tasks=arr.map(t=>{const s=parse(t.start)||(typeof t.s==='number'?t.s:todayN());let e=parse(t.end);if(isNaN(e))e=typeof t.e==='number'?t.e:s;
+    const type=['task','milestone','group'].includes(t.type)?t.type:'task';
+    return{id:String(t.id||uid()),name:String(t.name||'Vorgang'),type,s,e:Math.max(s,e),progress:Math.min(100,Math.max(0,+t.progress||0)),owner:String(t.owner||''),
+      color:/^#[0-9a-f]{6}$/i.test(t.color||'')?t.color:COLORS[0],parent:t.parent&&ids.has(String(t.parent))?String(t.parent):null,
+      deps:(t.dependencies||t.deps||[]).map(String).filter(d=>ids.has(d)),notes:String(t.notes||''),collapsed:!!t.collapsed}});
+  snap();state.title=o.title||state.title;state.tasks=tasks;sel=null;commit();goToday();toast(tasks.length+' Vorgänge importiert');
+}
+
+/* ---------- Toast & Tooltip ---------- */
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2400)}
+const tip=$('#tip');function hideTip(){tip.style.display='none'}
+function showTip(t,e){const W=wbs();const ms=t.type==='milestone';
+  tip.innerHTML=`<b>${esc(W[t.id]+'  '+t.name)}</b>${ms?`<div><span class="k">Termin</span>${fmtL(t.s)}</div>`:`<div><span class="k">Start</span>${fmtL(t.s)}</div><div><span class="k">Ende</span>${fmtL(t.e)}</div><div><span class="k">Dauer</span>${workdays(t.s,t.e)} Arbeitstage</div>`}<div><span class="k">Fortschritt</span>${t.progress}%</div>${t.owner?`<div><span class="k">Verantwortlich</span>${esc(t.owner)}</div>`:''}${t.notes?`<div style="margin-top:5px;color:#cbd5e1">${esc(t.notes).slice(0,180)}</div>`:''}`;
+  tip.style.display='block';const r=tip.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+16;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-12;tip.style.left=x+'px';tip.style.top=y+'px'}
+
+/* ---------- Interaktion: Diagramm ---------- */
+const cv=$('#canvas'),chart=$('#chart'),left=$('#left');let drag=null;
+cv.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;hideTip();const el=e.target.closest('[data-id]');
+  if(!el){if(sel){sel=null;render()}return}
+  const id=el.dataset.id,t=M()[id],h=e.target.dataset.h||'m',now=Date.now();
+  if(lastDown.id===id&&now-lastDown.t<380&&h!=='link'){lastDown={id:null,t:0};openDialog(id);return}
+  lastDown={id,t:now};
+  if(sel!==id){sel=id;render()}
+  const orig={};state.tasks.forEach(x=>orig[x.id]={s:x.s,e:x.e,p:x.progress});
+  drag={id,h,x0:e.clientX,y0:e.clientY,orig,moved:false,snap:false,type:t.type};
+  if(h==='link'){const r=cv.getBoundingClientRect(),i=visible().findIndex(v=>v.id===id);drag.lx=(t.type==='milestone'?(t.s+1-R.a)*R.dw+8:(t.e+1-R.a)*R.dw);drag.ly=i*RH+RH/2;
+    const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('class','tmp');s.setAttribute('width',cv.offsetWidth);s.setAttribute('height',cv.offsetHeight);s.style.zIndex=9;
+    s.innerHTML=`<path fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="5 4"/>`;cv.appendChild(s);drag.tmp=s}
+  cv.setPointerCapture(e.pointerId);e.preventDefault();
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag){const el=e.target.closest('[data-id]');if(el&&!modal.classList.contains('open'))showTip(M()[el.dataset.id],e);else hideTip();return}
+  hideTip();const dx=e.clientX-drag.x0;
+  if(!drag.moved&&Math.abs(dx)<3&&Math.abs(e.clientY-drag.y0)<3)return;
+  if(drag.h==='link'){const r=cv.getBoundingClientRect();drag.tmp.firstChild.setAttribute('d',`M${drag.lx},${drag.ly}L${e.clientX-r.left},${e.clientY-r.top}`);drag.moved=true;return}
+  if(!drag.snap){snap();drag.snap=true}drag.moved=true;
+  const m=M(),t=m[drag.id],o=drag.orig,dd=Math.round(dx/R.dw);
+  if(drag.h==='m'){
+    if(t.type==='group'){state.tasks.forEach(x=>{if(x.type!=='group'&&isDesc(x,t.id,m)){x.s=o[x.id].s+dd;x.e=o[x.id].e+dd}})}
+    else{t.s=o[t.id].s+dd;t.e=o[t.id].e+dd}
+  }else if(drag.h==='l'){t.s=Math.min(o[t.id].s+dd,t.e)}
+  else if(drag.h==='r'){t.e=Math.max(o[t.id].e+dd,t.s)}
+  else if(drag.h==='p'){const r=cv.getBoundingClientRect(),bx=r.left+(t.s-R.a)*R.dw,bw=(t.e-t.s+1)*R.dw;t.progress=Math.max(0,Math.min(100,Math.round((e.clientX-bx)/bw*20)*5))}
+  computeGroups();render();
+  if(drag.h!=='p'){const n=drag.h==='l'?t.s:drag.h==='r'?t.e:t.s;tip.innerHTML=`<b>${esc(t.name)}</b>${fmtL(t.s)} – ${fmtL(t.e)} · ${workdays(t.s,t.e)} AT`;tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+16)+'px'}
+  // Auto-Scroll am Rand
+  const cr=chart.getBoundingClientRect();if(e.clientX>cr.right-40)chart.scrollLeft+=12;else if(e.clientX<cr.left+40)chart.scrollLeft-=12;
+});
+function endDrag(e){
+  if(!drag)return;const d=drag;drag=null;hideTip();
+  if(d.h==='link'){d.tmp.remove();const el=document.elementFromPoint(e.clientX,e.clientY);const tg=el&&el.closest&&el.closest('[data-id]');
+    if(tg&&tg.dataset.id!==d.id){const m=M(),to=m[tg.dataset.id],from=m[d.id];
+      if(to.type==='group'||from.type==='group')toast('Abhängigkeiten nur zwischen Aufgaben und Meilensteinen');
+      else if(to.deps.includes(from.id))toast('Abhängigkeit besteht bereits');
+      else if(dependsOn(from.id,to.id,m))toast('Nicht möglich – das würde einen Zyklus erzeugen');
+      else{snap();to.deps.push(from.id);commit();toast('Abhängigkeit angelegt: '+from.name+' → '+to.name)}}
+    else render();return}
+  if(d.moved)commit();
+}
+cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+cv.addEventListener('pointerleave',()=>{if(!drag)hideTip()});
+
+/* ---------- Interaktion: Tabelle ---------- */
+$('#gbody').addEventListener('pointerdown',e=>{
+  const tog=e.target.closest('[data-tog]');if(tog){const t=M()[tog.dataset.tog];t.collapsed=!t.collapsed;persist();render();return}
+  const row=e.target.closest('[data-row]');if(!row)return;const id=row.dataset.row,now=Date.now();
+  if(lastDown.id===id&&now-lastDown.t<380){lastDown={id:null,t:0};openDialog(id);return}
+  lastDown={id,t:now};select(id,true);
+});
+left.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>=Math.abs(e.deltaX)){chart.scrollTop+=e.deltaY;e.preventDefault()}},{passive:false});
+chart.addEventListener('scroll',()=>{left.scrollTop=chart.scrollTop;hideTip()});
+
+/* Splitter */
+const sp=$('#split');
+sp.addEventListener('pointerdown',e=>{sp.setPointerCapture(e.pointerId);sp.classList.add('drag');const x0=e.clientX,w0=left.offsetWidth;
+  const mv=ev=>{state.gridW=Math.max(200,Math.min(window.innerWidth-260,w0+ev.clientX-x0));left.style.width=state.gridW+'px'};
+  const up=()=>{sp.classList.remove('drag');sp.removeEventListener('pointermove',mv);sp.removeEventListener('pointerup',up);persist();render()};
+  sp.addEventListener('pointermove',mv);sp.addEventListener('pointerup',up)});
+
+/* ---------- Toolbar ---------- */
+document.querySelectorAll('i[data-i]').forEach(i=>{i.outerHTML=`<svg viewBox="0 0 24 24">${ICONS[i.dataset.i]}</svg>`});
+const menu=$('#menu');
+const ACT={
+  addTask:()=>addItem('task'),addMilestone:()=>addItem('milestone'),addGroup:()=>addItem('group'),
+  indent,outdent,up:()=>move(-1),down:()=>move(1),del,edit:()=>sel&&openDialog(sel),undo,redo,today:goToday,
+  critical:()=>{state.critical=!state.critical;persist();render()},
+  auto:()=>{state.auto=!state.auto;if(state.auto){snap();commit();toast('Auto-Planung aktiv – Nachfolger werden automatisch verschoben')}else{persist();render();toast('Auto-Planung aus')}},
+  menu:()=>menu.classList.toggle('open'),
+  new:()=>askConfirm('Neues Projekt','Das aktuelle Projekt wird geleert. Exportiere es vorher als JSON, wenn du es behalten willst.','Neues Projekt',()=>{snap();state.title='Neues Projekt';state.tasks=[];sel=null;commit()}),
+  sample:()=>askConfirm('Beispielprojekt laden','Das aktuelle Projekt wird durch das Beispielprojekt ersetzt (rückgängig machbar mit Strg+Z).','Laden',()=>{snap();const s=sample();state.title=s.title;state.tasks=s.tasks;sel=null;commit();goToday()}),
+  import:()=>$('#file').click(),
+  exportJson:()=>deliver(slug()+'.json',JSON.stringify(exportObj(),null,2),'application/json'),
+  exportCsv,print:()=>{try{window.print()}catch(e){}},help:showHelp
+};
+document.querySelector('.tools').addEventListener('click',e=>{const b=e.target.closest('[data-act],[data-zoom]');if(!b||b.disabled)return;
+  if(b.dataset.zoom)return setZoom(b.dataset.zoom);const a=b.dataset.act;if(a!=='menu')menu.classList.remove('open');ACT[a]&&ACT[a]()});
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('.grp'))menu.classList.remove('open')});
+if(inFrame)$('#mPrint').style.display='none';
+$('#file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importText(r.result);r.readAsText(f);e.target.value=''});
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=()=>importText(r.result);r.readAsText(f)}});
+const ti=$('#title');ti.addEventListener('input',()=>{state.title=ti.value;document.title=(ti.value||'Projekt')+' – Gantt Planner';persist()});
+ti.addEventListener('keydown',e=>{if(e.key==='Enter')ti.blur()});
+
+/* ---------- Tastatur ---------- */
+document.addEventListener('keydown',e=>{
+  if(modal.classList.contains('open')){if(e.key==='Escape')closeModal(true);return}
+  const tg=e.target;if(tg.matches&&tg.matches('input,textarea,select'))return;
+  const k=e.key,mod=e.ctrlKey||e.metaKey;
+  if(mod&&k.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+  if(mod&&k.toLowerCase()==='y'){e.preventDefault();redo();return}
+  if(mod)return;
+  if(k==='Escape'){menu.classList.remove('open');if(sel){sel=null;render()}return}
+  if(k==='n'||k==='N')return addItem('task');if(k==='m'||k==='M')return addItem('milestone');if(k==='p'||k==='P')return addItem('group');
+  if(k==='t'||k==='T')return goToday();
+  if(['1','2','3','4'].includes(k))return setZoom(['day','week','month','quarter'][+k-1]);
+  const vis=visible(),i=vis.findIndex(v=>v.id===sel);
+  if(k==='ArrowDown'||k==='ArrowUp'){e.preventDefault();if(e.altKey)return move(k==='ArrowUp'?-1:1);
+    const n=vis[Math.max(0,Math.min(vis.length-1,i<0?0:i+(k==='ArrowDown'?1:-1)))];if(n)select(n.id,true);return}
+  if(!sel)return;
+  if(k==='Enter'){e.preventDefault();openDialog(sel)}
+  else if(k==='Delete'||k==='Backspace'){e.preventDefault();del()}
+  else if(k==='Tab'){e.preventDefault();e.shiftKey?outdent():indent()}
+  else if(k==='ArrowLeft'||k==='ArrowRight'){const t=cur();if(t&&t.type==='group'){t.collapsed=k==='ArrowLeft';persist();render()}}
+});
+window.addEventListener('resize',()=>render());
+
+/* ---------- Start ---------- */
+state=load();
+left.style.width=state.gridW+'px';
+computeGroups();schedule();computeGroups();render();
+requestAnimationFrame(()=>{chart.scrollLeft=(todayN()-R.a)*R.dw-chart.clientWidth/3});
+})();
+</script>
+</body>
+</html>
